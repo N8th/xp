@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>XP Orbs Final Fix</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #000;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+
+    <script>
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d");
+      let W = (canvas.width = window.innerWidth);
+      let H = (canvas.height = window.innerHeight);
+
+      window.addEventListener("resize", () => {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      });
+
+      const FRAME_COUNT = 13;
+      const FRAME_WIDTH = 360; // one orb frame
+      const FRAME_HEIGHT = 360; // actual height of orb image
+
+      const sprite = new Image();
+      sprite.src = "xp-sprite.png"; // confirm this name matches your file
+
+      let mouse = { x: W / 2, y: H / 2, down: false };
+      canvas.addEventListener("mousemove", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+      });
+      canvas.addEventListener("mousedown", () => (mouse.down = true));
+      canvas.addEventListener("mouseup", () => (mouse.down = false));
+
+      class Orb {
+        constructor() {
+          this.reset();
+        }
+
+        reset() {
+          this.x = Math.random() * W;
+          this.y = Math.random() * H;
+          this.vx = (Math.random() - 0.5) * 1.5;
+          this.vy = (Math.random() - 0.5) * 1.5;
+          this.size = 42 + Math.random() * 8;
+          this.frame = Math.floor(Math.random() * FRAME_COUNT);
+          this.frameTimer = 0;
+        }
+
+        update() {
+          const dx = mouse.x - this.x;
+          const dy = mouse.y - this.y;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist < 200) {
+            const pull = (200 - dist) / 200;
+            const angle = Math.atan2(dy, dx);
+            this.vx += Math.cos(angle) * pull * 0.6;
+            this.vy += Math.sin(angle) * pull * 0.6;
+          }
+
+          if (mouse.down) {
+            this.vx += (Math.random() - 0.5) * 4;
+            this.vy += (Math.random() - 0.5) * 4;
+          }
+
+          this.vx *= 0.92;
+          this.vy *= 0.92;
+          this.x += this.vx;
+          this.y += this.vy;
+
+          this.frameTimer++;
+          if (this.frameTimer >= 5) {
+            this.frame = (this.frame + 1) % FRAME_COUNT;
+            this.frameTimer = 0;
+          }
+
+          if (this.x < -50) this.x = W + 50;
+          if (this.x > W + 50) this.x = -50;
+          if (this.y < -50) this.y = H + 50;
+          if (this.y > H + 50) this.y = -50;
+        }
+
+        draw() {
+          const sx = this.frame * FRAME_WIDTH;
+          ctx.drawImage(
+            sprite,
+            sx,
+            0,
+            FRAME_WIDTH,
+            FRAME_HEIGHT,
+            this.x - this.size / 2,
+            this.y - this.size / 2,
+            this.size,
+            this.size * (FRAME_HEIGHT / FRAME_WIDTH) // keep sprite ratio
+          );
+        }
+      }
+
+      const orbs = [];
+      for (let i = 0; i < 100; i++) orbs.push(new Orb());
+
+      sprite.onload = () => {
+        function animate() {
+          ctx.clearRect(0, 0, W, H);
+          orbs.forEach((orb) => {
+            orb.update();
+            orb.draw();
+          });
+          requestAnimationFrame(animate);
+        }
+        animate();
+      };
+    </script>
+  </body>
+</html>
