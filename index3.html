@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>XP Collectable Orbs</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #000;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+        touch-action: none;
+        image-rendering: pixelated;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script>
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d");
+      let W = (canvas.width = window.innerWidth);
+      let H = (canvas.height = window.innerHeight);
+
+      window.addEventListener("resize", () => {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      });
+
+      const FRAME_COUNT = 13;
+      const FRAME_WIDTH = 360;
+      const FRAME_HEIGHT = 360;
+      const sprite = new Image();
+      sprite.src = "xp-sprite.png";
+
+      let mouse = { x: W / 2, y: H / 2, down: false };
+      let lastCollected = 0;
+      let collectedPerSecond = 0;
+      let collectedThisSecond = 0;
+      let lastRespawn = Date.now();
+      const MAX_ORBS = 100;
+      const RESPAWN_INTERVAL = 3000; // ms
+      const MAX_COLLECT_RATE = 3; // per second
+
+      canvas.addEventListener("touchstart", (e) => {
+        if (e.touches.length > 0) {
+          mouse.x = e.touches[0].clientX;
+          mouse.y = e.touches[0].clientY;
+          mouse.down = true;
+        }
+      });
+      canvas.addEventListener("touchmove", (e) => {
+        if (e.touches.length > 0) {
+          mouse.x = e.touches[0].clientX;
+          mouse.y = e.touches[0].clientY;
+        }
+      });
+      canvas.addEventListener("touchend", () => {
+        mouse.down = false;
+      });
+
+      canvas.addEventListener("mousemove", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+      });
+      canvas.addEventListener("mousedown", () => (mouse.down = true));
+      canvas.addEventListener("mouseup", () => (mouse.down = false));
+
+      class Orb {
+        constructor() {
+          this.reset();
+        }
+
+        reset() {
+          this.x = Math.random() * W;
+          this.y = Math.random() * H;
+          this.vx = (Math.random() - 0.5) * 1.5;
+          this.vy = (Math.random() - 0.5) * 1.5;
+          this.size = 28 + Math.random() * 6;
+          this.frame = Math.floor(Math.random() * FRAME_COUNT);
+          this.frameTimer = 0;
+          this.collected = false;
+          this.timeCollected = 0;
+        }
+
+        update() {
+          if (this.collected) return;
+
+          const dx = mouse.x - this.x;
+          const dy = mouse.y - this.y;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist < 120) {
+            const pull = (120 - dist) / 120;
+            const angle = Math.atan2(dy, dx);
+            this.vx += Math.cos(angle) * pull * 0.5;
+            this.vy += Math.sin(angle) * pull * 0.5;
+          }
+
+          this.vx *= 0.92;
+          this.vy *= 0.92;
+          this.x += this.vx;
+          this.y += this.vy;
+
+          this.frameTimer++;
+          if (this.frameTimer >= 5) {
+            this.frame = (this.frame + 1) % FRAME_COUNT;
+            this.frameTimer = 0;
+          }
+
+          // Check for collection
+          if (mouse.down && dist < this.size && canCollect()) {
+            this.collected = true;
+            this.timeCollected = Date.now();
+          }
+
+          // Wrap
+          if (this.x < -50) this.x = W + 50;
+          if (this.x > W + 50) this.x = -50;
+          if (this.y < -50) this.y = H + 50;
+          if (this.y > H + 50) this.y = -50;
+        }
+
+        draw() {
+          if (this.collected) return;
+          const sx = this.frame * FRAME_WIDTH;
+          const targetW = this.size;
+          const targetH = this.size * (FRAME_HEIGHT / FRAME_WIDTH);
+          ctx.drawImage(
+            sprite,
+            sx,
+            0,
+            FRAME_WIDTH,
+            FRAME_HEIGHT,
+            this.x - targetW / 2,
+            this.y - targetH / 2,
+            targetW,
+            targetH
+          );
+        }
+      }
+
+      const orbs = [];
+      for (let i = 0; i < MAX_ORBS; i++) orbs.push(new Orb());
+
+      function canCollect() {
+        const now = Date.now();
+        if (now - lastCollected >= 1000) {
+          collectedThisSecond = 0;
+          lastCollected = now;
+        }
+        if (collectedThisSecond < MAX_COLLECT_RATE) {
+          collectedThisSecond++;
+          return true;
+        }
+        return false;
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, W, H);
+        const now = Date.now();
+
+        // Respawn orbs every 3s
+        if (now - lastRespawn >= RESPAWN_INTERVAL) {
+          const collected = orbs.filter((o) => o.collected);
+          if (collected.length > 0) {
+            collected[0].reset();
+          }
+          lastRespawn = now;
+        }
+
+        orbs.forEach((o) => {
+          o.update();
+          o.draw();
+        });
+
+        requestAnimationFrame(animate);
+      }
+
+      sprite.onload = animate;
+    </script>
+  </body>
+</html>
